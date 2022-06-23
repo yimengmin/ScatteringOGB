@@ -20,7 +20,8 @@ from torch_geometric.datasets import WikiCS
 from torch_geometric.utils import to_scipy_sparse_matrix
 import torch_geometric.transforms as T
 from torch_geometric.utils import to_scipy_sparse_matrix
-from utils import sparse_mx_to_torch_sparse_tensor
+from utils import normalize_adjacency_matrix,normalizemx
+from utils import normalize_adjacency_matrix,accuracy,scattering1st,sparse_mx_to_torch_sparse_tensor
 from layers import GC_withres
 import torch.optim as optim
 import numpy as np
@@ -33,7 +34,7 @@ from ogb.nodeproppred import Evaluator #use to evalatute the accuracy
 evaluator = Evaluator("ogbn-arxiv")
 ### use gcn
 #from torch_geometric.nn import GCNConv, ChebConv  # noqa
-from layers import GC_withres
+from layers import GC_withres,GC
 parser = argparse.ArgumentParser()
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disables CUDA training.')
@@ -114,22 +115,39 @@ y_true = data.y.to(device)
 
 
 def train(epoch):
-    global valid_error
-    t = time.time()
     model.train()
     optimizer.zero_grad()
     out_feature = model(features,adj) 
     y_pred = out_feature.argmax(dim=-1, keepdim=True)
 #    print(y_pred.size())
 #    loss_train = F.nll_loss(y_pred[split_idx['train']], y_true.squeeze(1)[split_idx['train']])
-    print('---')
     loss_train = F.nll_loss(out_feature[split_idx['train']], y_true.squeeze(1)[split_idx['train']])
 #    acc_train = accuracy(out_feature[split_idx['train']], y_true[split_idx['train']])
     acc_train = evaluator.eval({'y_true': y_true[split_idx['train']],'y_pred': y_pred[split_idx['train']],})['acc']
-    print(acc_train)
+    print('Training Accuracy at %d iteration: %.5f'%(epoch,acc_train))
     loss_train.backward()
     optimizer.step()
 
+def vali(epoch):
+    model.eval()
+    out_feature = model(features,adj)
+    y_pred = out_feature.argmax(dim=-1, keepdim=True)
+    acc_train = evaluator.eval({'y_true': y_true[split_idx['valid']],'y_pred': y_pred[split_idx['valid']],})['acc']
+    print('Validation Accuracy at %d iteration: %.5f'%(epoch,acc_train))
 
-for i in range(args.epochs):
+
+def test(epoch):
+    model.eval()
+    out_feature = model(features,adj)
+    y_pred = out_feature.argmax(dim=-1, keepdim=True)
+    acc_train = evaluator.eval({'y_true': y_true[split_idx['test']],'y_pred': y_pred[split_idx['test']],})['acc']
+    print('Test Accuracy at %d iteration: %.5f'%(epoch,acc_train))
+
+for i in range(args.epochs+1):
     train(i)
+    if i%50 == 0:
+        vali(i)
+        test(i)
+    if i%1000 ==0:
+        torch.save(model.state_dict(),'SAved_ogbmodels/state_dict%d.pt'%i)
+
