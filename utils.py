@@ -4,7 +4,6 @@ import torch
 import sys
 import pickle as pkl
 import networkx as nx
-from normalization import fetch_normalization, row_normalize
 from time import perf_counter
 def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     """Convert a scipy sparse matrix to a torch sparse tensor."""

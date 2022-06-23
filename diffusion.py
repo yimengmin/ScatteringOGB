@@ -3,7 +3,6 @@ import torch
 import sys
 import pickle
 import networkx as nx
-from normalization import fetch_normalization, row_normalize
 from torch_geometric.utils.convert import to_scipy_sparse_matrix
 import numpy as np
 import json
