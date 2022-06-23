@@ -33,7 +33,7 @@ from ogb.nodeproppred import Evaluator #use to evalatute the accuracy
 evaluator = Evaluator("ogbn-arxiv")
 ### use gcn
 #from torch_geometric.nn import GCNConv, ChebConv  # noqa
-from layers import GC_withres,GC
+from layers import GC_withres
 parser = argparse.ArgumentParser()
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disables CUDA training.')
