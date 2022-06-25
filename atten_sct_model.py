@@ -15,6 +15,15 @@ class ScattterAttentionLayer(nn.Module):
         self.alpha = alpha
 
         self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))
+        self.mlp = nn.Sequential(nn.Linear(in_features, 512),\
+                nn.LeakyReLU(),\
+                nn.Dropout(dropout),\
+                nn.Linear(512, 256),\
+                nn.LeakyReLU(),\
+                nn.Dropout(dropout),\
+                nn.Linear(256, out_features),\
+                nn.LeakyReLU()
+                )
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
 #        self.W1 = nn.Parameter(torch.zeros(size=(in_features, out_features)))
 #        nn.init.xavier_uniform_(self.W1.data, gain=1.414)
@@ -31,9 +40,10 @@ class ScattterAttentionLayer(nn.Module):
         self.a = nn.Parameter(torch.zeros(size=(2*out_features, 1)))
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
         self.leakyrelu = nn.LeakyReLU(self.alpha)
-    def forward(self,input,adj):
+    def forward(self,input,adj,data_index = [1,2,3,4]):
         # input is the feature
-        support0 = torch.mm(input, self.W)
+#        support0 = torch.mm(input, self.W)
+        support0 = self.mlp(input)
         gcn_diffusion_list = GCN_diffusion(adj,3,support0)
         N = support0.size()[0]
         h_A =  gcn_diffusion_list[0]
@@ -56,9 +66,13 @@ class ScattterAttentionLayer(nn.Module):
         h_A^3: ...
         h_sct_1: ...
         h_sct_2: ...
-        h_sct_3：...
+        h_sct_3: ...
         '''
         h = support0
+
+
+        ####
+        ####
 #        h = torch.spmm(A_nor, torch.mm(input, self.W))
         a_input_A = torch.cat([h,h_A]).view(N, -1, 2 * self.out_features)
         a_input_A2 = torch.cat([h,h_A2]).view(N, -1, 2 * self.out_features)
@@ -75,9 +89,12 @@ class ScattterAttentionLayer(nn.Module):
         '''
 
         attention = F.softmax(e, dim=1).view(N, 6, -1)
+#        print('attention on %d nodes'%N)
+#        print(attention[data_index])
         h_all = torch.cat((h_A.unsqueeze(dim=2),h_A2.unsqueeze(dim=2),h_A3.unsqueeze(dim=2),\
                 h_sct1.unsqueeze(dim=2),h_sct2.unsqueeze(dim=2),h_sct3.unsqueeze(dim=2)),dim=2).view(N, 6, -1)
         h_prime = torch.mul(attention, h_all) # element eise product
         h_prime = torch.mean(h_prime,1)
+        
 #        return h_prime
         return [h_prime,attention]

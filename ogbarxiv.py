@@ -4,7 +4,7 @@
 from ogb.nodeproppred import Evaluator
 import torch
 import torch.nn.functional as F
-#from torch_geometric.utils import to_undirected, add_self_loops
+from torch_geometric.utils import to_undirected, add_self_loops
 from ogb.nodeproppred import PygNodePropPredDataset
 import time
 
@@ -16,8 +16,12 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.enabled = True
 import torch.nn as nn
+from torch_geometric.datasets import WikiCS
 from torch_geometric.utils import to_scipy_sparse_matrix
-from utils import sparse_mx_to_torch_sparse_tensor
+import torch_geometric.transforms as T
+from torch_geometric.utils import to_scipy_sparse_matrix
+from utils import normalize_adjacency_matrix,normalizemx
+from utils import normalize_adjacency_matrix,accuracy,scattering1st,sparse_mx_to_torch_sparse_tensor
 from layers import GC_withres
 import torch.optim as optim
 import numpy as np
@@ -30,6 +34,7 @@ from ogb.nodeproppred import Evaluator #use to evalatute the accuracy
 evaluator = Evaluator("ogbn-arxiv")
 ### use gcn
 #from torch_geometric.nn import GCNConv, ChebConv  # noqa
+from layers import GC_withres,GC
 parser = argparse.ArgumentParser()
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disables CUDA training.')
@@ -40,7 +45,7 @@ parser.add_argument('--epochs', type=int, default=200,
                     help='Number of epochs to train.')
 parser.add_argument('--lr', type=float, default=0.001,
                     help='Initial learning rate.')
-parser.add_argument('--weight_decay', type=float, default=5e-5,
+parser.add_argument('--weight_decay', type=float, default=5e-4,
                     help='Weight decay (L2 loss on parameters).')
 parser.add_argument('--l1', type=float, default=0.0,
                     help='Weight decay (L1 loss on parameters).')
@@ -99,7 +104,9 @@ adj = sparse_mx_to_torch_sparse_tensor(adj).cuda()
 #print(h_sct1.size())
 model = SCT_GAT_ogbarxiv(features.shape[1],args.hid,dataset.num_classes,dropout=args.dropout,nheads=args.nheads,smoo=args.smoo)
 model = model.cuda()
-optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+#optimizer = torch.optim.RMSprop(model.parameters(), lr=args.lr,weight_decay=args.weight_decay)
+optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,weight_decay=args.weight_decay)
+
 #pred = out_feature[train_idx]
 
 
@@ -112,7 +119,7 @@ y_true = data.y.to(device)
 def train(epoch):
     model.train()
     optimizer.zero_grad()
-    out_feature = model(features,adj) 
+    out_feature = model(features,adj,split_idx['train']) 
     y_pred = out_feature.argmax(dim=-1, keepdim=True)
 #    print(y_pred.size())
 #    loss_train = F.nll_loss(y_pred[split_idx['train']], y_true.squeeze(1)[split_idx['train']])
