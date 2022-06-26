@@ -78,7 +78,8 @@ if args.cuda:
 from torch.optim.lr_scheduler import MultiStepLR,StepLR
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # Num of feat:1639
-dataset = PygNodePropPredDataset(name="ogbn-arxiv")
+dataset_name = "ogbn-arxiv"
+dataset = PygNodePropPredDataset(name=dataset_name)
 split_idx = dataset.get_idx_split()
 
 
@@ -136,6 +137,7 @@ def vali(epoch):
     y_pred = out_feature.argmax(dim=-1, keepdim=True)
     acc_train = evaluator.eval({'y_true': y_true[split_idx['valid']],'y_pred': y_pred[split_idx['valid']],})['acc']
     print('Validation Accuracy at %d iteration: %.5f'%(epoch,acc_train))
+    return acc_train
 
 
 def test(epoch):
@@ -143,13 +145,21 @@ def test(epoch):
     out_feature = model(features,adj)
     y_pred = out_feature.argmax(dim=-1, keepdim=True)
     acc_train = evaluator.eval({'y_true': y_true[split_idx['test']],'y_pred': y_pred[split_idx['test']],})['acc']
-    print('Test Accuracy at %d iteration: %.5f'%(epoch,acc_train))
+    print('Championship model\'s  accuracy in %d iterations: %.5f'%(epoch,acc_train))
 
+
+highset_validation_accuracy = 0.1
 for i in range(args.epochs+1):
     train(i)
-    if i%50 == 0:
-        vali(i)
-        test(i)
-    if i%1000 ==0:
-        torch.save(model.state_dict(),'SAved_ogbmodels/state_dict%d.pt'%i)
-
+    if i%25 == 0:
+        validation_accuracy = vali(i)
+        if validation_accuracy>highset_validation_accuracy:
+            highset_validation_accuracy = validation_accuracy
+            torch.save(model.state_dict(),'SAved_ogbmodels/championship_%s_model_dict.pt'%dataset_name)
+#        test(i)
+#    if i%1000 ==0:
+model = SCT_GAT_ogbarxiv(features.shape[1],args.hid,dataset.num_classes,dropout=args.dropout,nheads=args.nheads,smoo=args.smoo)
+model = model.cuda()
+model.load_state_dict(torch.load('SAved_ogbmodels/championship_%s_model_dict.pt'%dataset_name))
+model.eval()
+test(2000)
