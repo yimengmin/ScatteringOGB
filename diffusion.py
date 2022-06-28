@@ -3,6 +3,7 @@ import torch
 import sys
 import pickle
 import networkx as nx
+from normalization import fetch_normalization, row_normalize
 from torch_geometric.utils.convert import to_scipy_sparse_matrix
 import numpy as np
 import json
@@ -69,7 +70,37 @@ def scattering_diffusion(sptensor,feature):
     all on cuda
     '''
     #generate 1st scattering feature
-    h_sct1 = SCT1st(sptensor,1,feature)
-    h_sct2 = SCT1st(sptensor,2,feature)
-    h_sct3 = SCT1st(sptensor,3,feature)
+#    h_sct1 = SCT1st(sptensor,1,feature)
+#    h_sct2 = SCT1st(sptensor,2,feature)
+#    h_sct3 = SCT1st(sptensor,3,feature)
+
+    h_sct1,h_sct2,h_sct3 = SCT1stv2(sptensor,3,feature)
+
     return h_sct1,h_sct2,h_sct3
+
+def SCT1stv2(sptensor,order,feature):
+    '''
+    sptensor = W
+    '''
+    degrees = torch.sparse.sum(sptensor,0)
+    D = degrees
+    D = D.to_dense() # transfer D from sparse tensor to normal torch tensor
+    D = torch.pow(D, -1)
+    D = D.unsqueeze(dim=1)
+    iteration = 2**order
+    scale_list = list(2**i - 1 for i in range(order+1))
+#    scale_list = [0,1,3,7]
+    feature_p = feature
+    sct_diffusion_list = []
+    for i in range(iteration):
+        D_inv_x = D*feature_p
+        W_D_inv_x = torch.spmm(sptensor,D_inv_x)
+        feature_p = 0.5*feature_p + 0.5*W_D_inv_x
+        if i in scale_list:
+            sct_diffusion_list += [feature_p,]
+    sct_feature1 = sct_diffusion_list[0]-sct_diffusion_list[1]
+    sct_feature2 = sct_diffusion_list[1]-sct_diffusion_list[2]
+    sct_feature3 = sct_diffusion_list[2]-sct_diffusion_list[3]
+    return sct_feature1,sct_feature2,sct_feature3
+
+
