@@ -18,7 +18,7 @@ class ScattterAttentionLayer(nn.Module):
         self.mlp = nn.Sequential(nn.Linear(in_features, 64),\
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
-                nn.Linear(32, 32),\
+                nn.Linear(64, 32),\
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
                 nn.Linear(32, out_features),\
