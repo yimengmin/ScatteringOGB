@@ -21,7 +21,7 @@ class ScattterAttentionLayer(nn.Module):
                 nn.Linear(32, 32),\
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
-                nn.Linear(16, out_features),\
+                nn.Linear(32, out_features),\
                 nn.LeakyReLU()
                 )
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
