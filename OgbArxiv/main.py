@@ -16,6 +16,7 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.enabled = True
 import torch.nn as nn
+from torch_geometric.datasets import WikiCS
 from torch_geometric.utils import to_scipy_sparse_matrix
 import torch_geometric.transforms as T
 from torch_geometric.utils import to_scipy_sparse_matrix
@@ -32,7 +33,7 @@ dataset_name = "ogbn-arxiv"
 from ogb.nodeproppred import Evaluator #use to evalatute the accuracy
 evaluator = Evaluator(dataset_name)
 ### use gcn
-#from torch_geometric.nn import GCNConv, ChebConv  # noqa
+from layers import GC_withres
 parser = argparse.ArgumentParser()
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disables CUDA training.')

@@ -42,3 +42,4 @@ class SCT_GAT_ogbarxiv(nn.Module):
         # save_attantion_list
 
         return F.log_softmax(x, dim=1)
+
