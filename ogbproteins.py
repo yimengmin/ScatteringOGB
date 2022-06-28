@@ -29,7 +29,7 @@ from models import SCT_GAT_ogbarxiv
 
 
 
-dataset_name = "ogbn-arxiv"
+dataset_name = "ogbn-proteins"
 
 from ogb.nodeproppred import Evaluator #use to evalatute the accuracy
 evaluator = Evaluator(dataset_name)
@@ -44,15 +44,15 @@ parser.add_argument('--fastmode', action='store_true', default=False,
 parser.add_argument('--seed', type=int, default=42, help='Random seed.')
 parser.add_argument('--epochs', type=int, default=200,
                     help='Number of epochs to train.')
-parser.add_argument('--lr', type=float, default=0.001,
+parser.add_argument('--lr', type=float, default=0.003,
                     help='Initial learning rate.')
 parser.add_argument('--weight_decay', type=float, default=5e-4,
                     help='Weight decay (L2 loss on parameters).')
 parser.add_argument('--l1', type=float, default=0.0,
                     help='Weight decay (L1 loss on parameters).')
-parser.add_argument('--hid', type=int, default=64,
+parser.add_argument('--hid', type=int, default=8,
                     help='Number of hidden units.')
-parser.add_argument('--nheads', type=int, default=1,
+parser.add_argument('--nheads', type=int, default=4,
                     help='Number of heads in attention mechism.')
 parser.add_argument('--data_spilt', type=int, default=0)
 parser.add_argument('--patience', type=int, default=200)
@@ -65,80 +65,66 @@ parser.add_argument('--smoo', type=float, default=0.1,
                     help='Smooth for Res layer')
 parser.add_argument('--use_gdc', action='store_true',
                     help='Use GDC preprocessing.')
+parser.add_argument('--valid_cluster_number', type=int, default=5,
+                    help='the number of sub-graphs for evaluation')
+parser.add_argument('--cluster_number', type=int, default=10,
+                    help='the number of sub-graphs for training')
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
 
 torch.manual_seed(args.seed)
 if args.cuda:
-    print('Traning on Cuda,yeah!')
     torch.cuda.manual_seed(args.seed)
 
 
 #from torch_geometric.nn import GATConv
 from torch.optim.lr_scheduler import MultiStepLR,StepLR
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# Num of feat:1639
-dataset = PygNodePropPredDataset(name=dataset_name)
+dataset = PygNodePropPredDataset(name = dataset_name)
+evaluator = Evaluator(name=dataset_name)
 split_idx = dataset.get_idx_split()
-
-
+train_idx, val_idx, test_idx = split_idx["train"], split_idx["valid"], split_idx["test"]
 data = dataset[0]
-device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
-x = data.x.to(device)
 edge_index = data.edge_index.to(device)
-# Num of feat:1639
 adj = to_scipy_sparse_matrix(edge_index = data.edge_index)
 adj = adj+ adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
-#print(type(adj)) #<class 'scipy.sparse.csr.csr_matrix'>
-#A_tilde = normalize_adjacency_matrix(adj,sp.eye(adj.shape[0]))
-#adj_p = normalizemx(adj)
-#
-features = data.x
-features = torch.FloatTensor(np.array(features))
+n_node_feats, n_edge_feats, n_classes = 0, 8, 112
+##https://github.com/classicsong/dgl/blob/gat_bot_ngnn/examples/pytorch/gat/bot_ngnn/gat_bot_ngnn.py
+#https://github.com/snap-stanford/ogb/blob/master/examples/nodeproppred/proteins/gnn.py
+#https://github.com/lightaime/deep_gcns_torch/blob/master/examples/ogb/ogbn_proteins/main.py
+degs = adj.sum(axis=0)
+# Move edge features to node features.
+degs = degs.getA1() #https://numpy.org/doc/stable/reference/generated/numpy.matrix.A1.html
+features = torch.FloatTensor(degs)
 features = features.to(device)
+features = torch.unsqueeze(features, 1) #torch.Size([132534, 1])
 adj = sparse_mx_to_torch_sparse_tensor(adj).cuda()
-#from diffusion import GCN_diffusion,scattering_diffusion
-#gcn_diffusion_list = GCN_diffusion(adj,3,features)
-#print(gcn_diffusion_list[1].size())
-#h_sct1,h_sct2,h_sct3 = scattering_diffusion(adj,features)
-#print(h_sct1.size())
-model = SCT_GAT_ogbarxiv(features.shape[1],args.hid,dataset.num_classes,dropout=args.dropout,nheads=args.nheads,smoo=args.smoo)
+
+model = SCT_GAT_ogbarxiv(1,args.hid,n_classes,dropout=args.dropout,nheads=args.nheads,smoo=args.smoo)
 model = model.cuda()
 
-#from torch.optim.lr_scheduler import StepLR
-#optimizer = torch.optim.RMSprop(model.parameters(), lr=args.lr,weight_decay=args.weight_decay)
+
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,weight_decay=args.weight_decay)
-#scheduler = StepLR(optimizer, step_size=100, gamma=0.9)
-#pred = out_feature[train_idx]
 
-
-### y true
 y_true = data.y.to(device)
-#y_true = y_true[split_idx['train']]
-
-
-
-def train(epoch):
+def train(epoch,criterion):
     model.train()
     optimizer.zero_grad()
-    out_feature = model(features,adj,split_idx['train']) 
-    y_pred = out_feature.argmax(dim=-1, keepdim=True)
-#    print(y_pred.size())
-#    loss_train = F.nll_loss(y_pred[split_idx['train']], y_true.squeeze(1)[split_idx['train']])
-    loss_train = F.nll_loss(out_feature[split_idx['train']], y_true.squeeze(1)[split_idx['train']])
-#    acc_train = accuracy(out_feature[split_idx['train']], y_true[split_idx['train']])
-    acc_train = evaluator.eval({'y_true': y_true[split_idx['train']],'y_pred': y_pred[split_idx['train']],})['acc']
+    out_feature = model(features,adj,split_idx['train'])
+    y_pred = out_feature
+    loss_train = criterion(out_feature[split_idx['train']], y_true.squeeze(1)[split_idx['train']].float())
+    acc_train = evaluator.eval({'y_true': y_true[split_idx['train']],'y_pred': y_pred[split_idx['train']],})["rocauc"]
     print('Training Accuracy at %d iteration: %.5f'%(epoch,acc_train))
     loss_train.backward()
     optimizer.step()
-#    scheduler.step()
+
 
 def vali(epoch):
     model.eval()
     out_feature = model(features,adj)
-    y_pred = out_feature.argmax(dim=-1, keepdim=True)
-    acc_train = evaluator.eval({'y_true': y_true[split_idx['valid']],'y_pred': y_pred[split_idx['valid']],})['acc']
+    y_pred = out_feature
+    acc_train = evaluator.eval({'y_true': y_true[split_idx['valid']],'y_pred': y_pred[split_idx['valid']],})['rocauc']
     print('Validation Accuracy at %d iteration: %.5f'%(epoch,acc_train))
     return acc_train
 
@@ -146,23 +132,21 @@ def vali(epoch):
 def test(epoch):
     model.eval()
     out_feature = model(features,adj)
-    y_pred = out_feature.argmax(dim=-1, keepdim=True)
-    acc_train = evaluator.eval({'y_true': y_true[split_idx['test']],'y_pred': y_pred[split_idx['test']],})['acc']
-    print('Championship model\'s test  accuracy in %d iterations: %.5f'%(epoch,acc_train))
-
+    y_pred = out_feature
+    acc_train = evaluator.eval({'y_true': y_true[split_idx['test']],'y_pred': y_pred[split_idx['test']],})['rocauc']
+    print('Championship model\'s  accuracy in %d iterations: %.5f'%(epoch,acc_train))
 
 highset_validation_accuracy = 0.1
 for i in range(args.epochs+1):
-    train(i)
-    if i%25 == 0:
+    train(i,criterion=nn.BCEWithLogitsLoss())
+    if i%5 == 0:
         validation_accuracy = vali(i)
         if validation_accuracy>highset_validation_accuracy:
             highset_validation_accuracy = validation_accuracy
             torch.save(model.state_dict(),'SAved_ogbmodels/championship_%s_model_dict.pt'%dataset_name)
-#        test(i)
-#    if i%1000 ==0:
-print('Championship Validation Accuracy: %.5f'%highset_validation_accuracy)
-model = SCT_GAT_ogbarxiv(features.shape[1],args.hid,dataset.num_classes,dropout=args.dropout,nheads=args.nheads,smoo=args.smoo)
+
+
+model = SCT_GAT_ogbarxiv(1,args.hid,n_classes,dropout=args.dropout,nheads=args.nheads,smoo=args.smoo)
 model = model.cuda()
 model.load_state_dict(torch.load('SAved_ogbmodels/championship_%s_model_dict.pt'%dataset_name))
 test(args.epochs)
