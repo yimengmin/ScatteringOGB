@@ -14,17 +14,24 @@ class ScattterAttentionLayer(nn.Module):
         self.out_features = out_features
         self.alpha = alpha
 
-        self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))
-        self.mlp = nn.Sequential(nn.Linear(in_features, 512),\
+#        self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))
+        self.mlp = nn.Sequential(nn.Linear(in_features, 256),\
+                nn.BatchNorm1d(256),\
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
-                nn.Linear(512, 256),\
+                nn.Linear(256, 128),\
+                nn.BatchNorm1d(128),
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
-                nn.Linear(256, out_features),\
+                nn.Linear(128, 64),\
+                nn.BatchNorm1d(64),\
+                nn.LeakyReLU(),\
+                nn.Dropout(dropout),\
+                nn.Linear(64, out_features),\
+                nn.BatchNorm1d(out_features),\
                 nn.LeakyReLU()
                 )
-        nn.init.xavier_uniform_(self.W.data, gain=1.414)
+#        nn.init.xavier_uniform_(self.W.data, gain=1.414)
 #        self.W1 = nn.Parameter(torch.zeros(size=(in_features, out_features)))
 #        nn.init.xavier_uniform_(self.W1.data, gain=1.414)
 #        self.W2 = nn.Parameter(torch.zeros(size=(in_features, out_features)))
@@ -40,7 +47,7 @@ class ScattterAttentionLayer(nn.Module):
         self.a = nn.Parameter(torch.zeros(size=(2*out_features, 1)))
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
         self.leakyrelu = nn.LeakyReLU(self.alpha)
-    def forward(self,input,adj,data_index = [1,2,3,4]):
+    def forward(self,input,adj,data_index = [5,6,7,8,9]):
         # input is the feature
 #        support0 = torch.mm(input, self.W)
         support0 = self.mlp(input)
@@ -50,9 +57,9 @@ class ScattterAttentionLayer(nn.Module):
         h_A2 =  gcn_diffusion_list[1]
         h_A3 =  gcn_diffusion_list[2]
         h_sct1,h_sct2,h_sct3 = scattering_diffusion(adj,support0)
-        h_sct1 = torch.FloatTensor.abs_(h_sct1)**1
-        h_sct2 = torch.FloatTensor.abs_(h_sct2)**1
-        h_sct3 = torch.FloatTensor.abs_(h_sct3)**1
+        h_sct1 = torch.abs(h_sct1)**1
+        h_sct2 = torch.abs(h_sct2)**1
+        h_sct3 = torch.abs(h_sct3)**1
 #        h_A =  torch.spmm(A_nor, torch.mm(input, self.W1))
 #        h_A2 = torch.spmm(A_nor,torch.spmm(A_nor, torch.mm(input, self.W2)))
 #        h_A3 = torch.spmm(A_nor,torch.spmm(A_nor,torch.spmm(A_nor, torch.mm(input, self.W3))))
@@ -74,14 +81,25 @@ class ScattterAttentionLayer(nn.Module):
         ####
         ####
 #        h = torch.spmm(A_nor, torch.mm(input, self.W))
-        a_input_A = torch.cat([h,h_A]).view(N, -1, 2 * self.out_features)
-        a_input_A2 = torch.cat([h,h_A2]).view(N, -1, 2 * self.out_features)
-        a_input_A3 = torch.cat([h,h_A3]).view(N, -1, 2 * self.out_features)
-        a_input_sct1 = torch.cat([h,h_sct1]).view(N, -1, 2 * self.out_features)
-        a_input_sct2 = torch.cat([h,h_sct2]).view(N, -1, 2 * self.out_features)
-        a_input_sct3 = torch.cat([h,h_sct3]).view(N, -1, 2 * self.out_features)
-        a_input =  torch.cat((a_input_A,a_input_A2,a_input_A3,a_input_sct1,a_input_sct2,a_input_sct3),1).view(N, 6, -1) 
-        e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(2))
+#        a_input_A = torch.cat([h,h_A]).view(N, -1, 2 * self.out_features)
+#        a_input_A2 = torch.cat([h,h_A2]).view(N, -1, 2 * self.out_features)
+#        a_input_A3 = torch.cat([h,h_A3]).view(N, -1, 2 * self.out_features)
+#        a_input_sct1 = torch.cat([h,h_sct1]).view(N, -1, 2 * self.out_features)
+#        a_input_sct2 = torch.cat([h,h_sct2]).view(N, -1, 2 * self.out_features)
+#        a_input_sct3 = torch.cat([h,h_sct3]).view(N, -1, 2 * self.out_features)
+
+        a_input_A = torch.hstack((h, h_A)).unsqueeze(1)
+        a_input_A2 = torch.hstack((h, h_A2)).unsqueeze(1)
+        a_input_A3 = torch.hstack((h, h_A3)).unsqueeze(1)
+        a_input_sct1 = torch.hstack((h, h_sct1)).unsqueeze(1)
+        a_input_sct2 = torch.hstack((h, h_sct2)).unsqueeze(1)
+        a_input_sct3 = torch.hstack((h, h_sct3)).unsqueeze(1)
+
+
+#        a_input =  torch.cat((a_input_A,a_input_A2,a_input_A3,a_input_sct1,a_input_sct2,a_input_sct3),1).view(N, 6, -1) 
+        a_input = torch.stack([a_input_A,a_input_A2,a_input_A3,a_input_sct1,a_input_sct2,a_input_sct3], dim=1)
+        e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(2)) #use activation
+#        e = torch.matmul(a_input, self.a).squeeze(2) #no activation
         '''
         a_input shape
         e shape: (N,-1)
@@ -91,6 +109,9 @@ class ScattterAttentionLayer(nn.Module):
         attention = F.softmax(e, dim=1).view(N, 6, -1)
 #        print('attention on %d nodes'%N)
 #        print(attention[data_index])
+#        print('--------')
+#        print(self.a)
+#        print('======')
         h_all = torch.cat((h_A.unsqueeze(dim=2),h_A2.unsqueeze(dim=2),h_A3.unsqueeze(dim=2),\
                 h_sct1.unsqueeze(dim=2),h_sct2.unsqueeze(dim=2),h_sct3.unsqueeze(dim=2)),dim=2).view(N, 6, -1)
         h_prime = torch.mul(attention, h_all) # element eise product

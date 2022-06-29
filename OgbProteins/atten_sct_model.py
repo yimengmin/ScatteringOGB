@@ -14,17 +14,22 @@ class ScattterAttentionLayer(nn.Module):
         self.out_features = out_features
         self.alpha = alpha
 
-        self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))
-        self.mlp = nn.Sequential(nn.Linear(in_features, 64),\
+        self.mlp = nn.Sequential(nn.Linear(in_features, 128),\
+                nn.BatchNorm1d(128),\
+                nn.LeakyReLU(),\
+                nn.Dropout(dropout),\
+                nn.Linear(128,64),\
+                nn.BatchNorm1d(64),\
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
                 nn.Linear(64, 32),\
+                nn.BatchNorm1d(32),\
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
                 nn.Linear(32, out_features),\
+                nn.BatchNorm1d(out_features),\
                 nn.LeakyReLU()
                 )
-        nn.init.xavier_uniform_(self.W.data, gain=1.414)
 #        self.W1 = nn.Parameter(torch.zeros(size=(in_features, out_features)))
 #        nn.init.xavier_uniform_(self.W1.data, gain=1.414)
 #        self.W2 = nn.Parameter(torch.zeros(size=(in_features, out_features)))
@@ -38,7 +43,6 @@ class ScattterAttentionLayer(nn.Module):
 #        self.W6 = nn.Parameter(torch.zeros(size=(in_features, out_features)))
 #        nn.init.xavier_uniform_(self.W6.data, gain=1.414)
         self.a = nn.Parameter(torch.zeros(size=(2*out_features, 1)))
-        nn.init.xavier_uniform_(self.a.data, gain=1.414)
         self.leakyrelu = nn.LeakyReLU(self.alpha)
     def forward(self,input,adj,data_index = [1,2,3,4]):
         # input is the feature
@@ -74,12 +78,25 @@ class ScattterAttentionLayer(nn.Module):
         ####
         ####
 #        h = torch.spmm(A_nor, torch.mm(input, self.W))
-        a_input_A = torch.cat([h,h_A]).view(N, -1, 2 * self.out_features)
-        a_input_A2 = torch.cat([h,h_A2]).view(N, -1, 2 * self.out_features)
-        a_input_A3 = torch.cat([h,h_A3]).view(N, -1, 2 * self.out_features)
-        a_input_sct1 = torch.cat([h,h_sct1]).view(N, -1, 2 * self.out_features)
-        a_input_sct2 = torch.cat([h,h_sct2]).view(N, -1, 2 * self.out_features)
-        a_input_sct3 = torch.cat([h,h_sct3]).view(N, -1, 2 * self.out_features)
+#        a_input_A = torch.cat([h,h_A]).view(N, -1, 2 * self.out_features)
+#        a_input_A2 = torch.cat([h,h_A2]).view(N, -1, 2 * self.out_features)
+#        a_input_A3 = torch.cat([h,h_A3]).view(N, -1, 2 * self.out_features)
+#        a_input_sct1 = torch.cat([h,h_sct1]).view(N, -1, 2 * self.out_features)
+#        a_input_sct2 = torch.cat([h,h_sct2]).view(N, -1, 2 * self.out_features)
+#        a_input_sct3 = torch.cat([h,h_sct3]).view(N, -1, 2 * self.out_features)
+
+
+        a_input_A = torch.hstack((h, h_A)).unsqueeze(1)
+        a_input_A2 = torch.hstack((h, h_A2)).unsqueeze(1)
+        a_input_A3 = torch.hstack((h, h_A3)).unsqueeze(1)
+        a_input_sct1 = torch.hstack((h, h_sct1)).unsqueeze(1)
+        a_input_sct2 = torch.hstack((h, h_sct2)).unsqueeze(1)
+        a_input_sct3 = torch.hstack((h, h_sct3)).unsqueeze(1)
+
+
+
+
+
         a_input =  torch.cat((a_input_A,a_input_A2,a_input_A3,a_input_sct1,a_input_sct2,a_input_sct3),1).view(N, 6, -1) 
         e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(2))
         '''
