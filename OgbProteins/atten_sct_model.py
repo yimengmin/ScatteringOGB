@@ -13,23 +13,6 @@ class ScattterAttentionLayer(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.alpha = alpha
-
-        self.mlp = nn.Sequential(nn.Linear(in_features,64),\
-#                nn.BatchNorm1d(64),\
-                nn.LeakyReLU(),\
-                nn.Dropout(dropout),\
-                nn.Linear(64,128),\
-#                nn.BatchNorm1d(128),\
-                nn.LeakyReLU(),\
-                nn.Dropout(dropout),\
-                nn.Linear(128, 256),\
-#                nn.BatchNorm1d(256),\
-                nn.LeakyReLU(),\
-                nn.Dropout(dropout),\
-                nn.Linear(256, out_features),\
-#                nn.BatchNorm1d(out_features),\
-                nn.LeakyReLU()
-                )
         self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
 #        self.W1 = nn.Parameter(torch.zeros(size=(in_features, out_features)))
@@ -49,15 +32,14 @@ class ScattterAttentionLayer(nn.Module):
     def forward(self,input,adj,data_index = [1,2,3,4]):
         # input is the feature
         support0 = torch.mm(input, self.W)
-#        support0 = self.mlp(input)
         gcn_diffusion_list = GCN_diffusion(adj,3,support0)
         N = support0.size()[0]
         h_A =  gcn_diffusion_list[0]
         h_A2 =  gcn_diffusion_list[1]
         h_A3 =  gcn_diffusion_list[2]
-#        h_A = self.leakyrelu(h_A)
-#        h_A2 = self.leakyrelu(h_A2)
-#        h_A3 = self.leakyrelu(h_A3)
+        h_A = self.leakyrelu(h_A)
+        h_A2 = self.leakyrelu(h_A2)
+        h_A3 = self.leakyrelu(h_A3)
         h_sct1,h_sct2,h_sct3 = scattering_diffusion(adj,support0)
         h_sct1 = torch.FloatTensor.abs_(h_sct1)**1
         h_sct2 = torch.FloatTensor.abs_(h_sct2)**1
@@ -103,7 +85,8 @@ class ScattterAttentionLayer(nn.Module):
 
 
         a_input =  torch.cat((a_input_A,a_input_A2,a_input_A3,a_input_sct1,a_input_sct2,a_input_sct3),1).view(N, 6, -1) 
-        e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(2))
+#        e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(2)) #plain gat, we got > 76 accuracy on ogb protein
+        e = torch.matmul(self.leakyrelu(a_input), self.a).squeeze(2) # GATv2
         '''
         a_input shape
         e shape: (N,-1)
