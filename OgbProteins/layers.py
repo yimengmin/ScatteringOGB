@@ -8,6 +8,7 @@ import torch
 from torch.nn.parameter import Parameter
 from torch.nn.modules.module import Module
 from utils import sparse_mx_to_torch_sparse_tensor
+
 class GC_withres(Module):
     """
     res conv
@@ -31,10 +32,22 @@ class GC_withres(Module):
             self.bias.data.uniform_(-stdv, stdv)
     def forward(self, input, adj):
         # adj is extracted from the graph structure
+        adj = adj.to_torch_sparse_coo_tensor()
         support = torch.mm(input, self.weight)
-        I_n = sp.eye(adj.shape[0])
+        I_n = sp.eye(adj.size(0))
         I_n = sparse_mx_to_torch_sparse_tensor(I_n).cuda()
-        output = torch.spmm((I_n+self.smooth*adj)/(1+self.smooth), support)
+        A_gcn = adj +  I_n
+        degrees = torch.sparse.sum(A_gcn,0)
+        D = degrees
+        D = D.to_dense() # transfer D from sparse tensor to normal torch tensor
+        D = torch.pow(D, -0.5)
+        D = D.unsqueeze(dim=1)
+        A_gcn_feature = support
+        A_gcn_feature = torch.mul(A_gcn_feature,D)
+        A_gcn_feature = torch.spmm(A_gcn,A_gcn_feature)
+        A_gcn_feature = torch.mul(A_gcn_feature,D)
+        output = A_gcn_feature * self.smooth + support
+        output = output/(1+self.smooth)
         if self.bias is not None:
             return output + self.bias
         else:
