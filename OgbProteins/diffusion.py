@@ -14,38 +14,49 @@ from utils import sparse_mx_to_torch_sparse_tensor
 def GCN_diffusion(sptensor,order,feature):
     """
     Creating a normalized adjacency matrix with self loops.
-    sptensor = W
+    sptensor = (n,n,8)
+    feature = (n,8)
     https://arxiv.org/pdf/1609.02907.pdf
     """
+    '''
+    add for protein
+    '''
+    sptensor = sptensor.to_torch_sparse_coo_tensor()
+
     I_n = sp.eye(sptensor.size(0))
     I_n = sparse_mx_to_torch_sparse_tensor(I_n).cuda()
+#    print('I_n size')
+#    print(I_n)
     A_gcn = sptensor +  I_n
-#    print('Type of A_gcn')
-#    print(type(A_gcn))
     degrees = torch.sparse.sum(A_gcn,0)
     D = degrees
     D = D.to_dense() # transfer D from sparse tensor to normal torch tensor
     D = torch.pow(D, -0.5)
     D = D.unsqueeze(dim=1)
     gcn_diffusion_list = []
+
     A_gcn_feature = feature
     for i in range(order):
-#        print('GCN diffusion step: %d'%i)
+##        print('GCN diffusion step: %d'%i)
         A_gcn_feature = torch.mul(A_gcn_feature,D)
         A_gcn_feature = torch.spmm(A_gcn,A_gcn_feature)
         A_gcn_feature = torch.mul(A_gcn_feature,D)
         gcn_diffusion_list += [A_gcn_feature,]
+ 
     return gcn_diffusion_list
 
 def SCT1st(sptensor,order,feature):
     '''
     sptensor = W
     '''
+    sptensor = sptensor.to_torch_sparse_coo_tensor()
+
     degrees = torch.sparse.sum(sptensor,0)
     D = degrees
     D = D.to_dense() # transfer D from sparse tensor to normal torch tensor
     D = torch.pow(D, -1)
     D = D.unsqueeze(dim=1)
+    D[D == float('inf')] = 0.
     iteration = 2**(order-1)
     feature_p = feature
     for i in range(iteration):
@@ -81,10 +92,12 @@ def SCT1stv2(sptensor,order,feature):
     '''
     sptensor = W
     '''
+    sptensor = sptensor.to_torch_sparse_coo_tensor()
     degrees = torch.sparse.sum(sptensor,0)
     D = degrees
     D = D.to_dense() # transfer D from sparse tensor to normal torch tensor
     D = torch.pow(D, -1)
+    D[D == float('inf')] = 0.
     D = D.unsqueeze(dim=1)
     iteration = 2**order
     scale_list = list(2**i - 1 for i in range(order+1))

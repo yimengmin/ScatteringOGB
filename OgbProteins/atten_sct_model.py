@@ -14,22 +14,24 @@ class ScattterAttentionLayer(nn.Module):
         self.out_features = out_features
         self.alpha = alpha
 
-        self.mlp = nn.Sequential(nn.Linear(in_features, 128),\
-                nn.BatchNorm1d(128),\
+        self.mlp = nn.Sequential(nn.Linear(in_features,64),\
+#                nn.BatchNorm1d(64),\
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
-                nn.Linear(128,64),\
-                nn.BatchNorm1d(64),\
+                nn.Linear(64,128),\
+#                nn.BatchNorm1d(128),\
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
-                nn.Linear(64, 32),\
-                nn.BatchNorm1d(32),\
+                nn.Linear(128, 256),\
+#                nn.BatchNorm1d(256),\
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
-                nn.Linear(32, out_features),\
-                nn.BatchNorm1d(out_features),\
+                nn.Linear(256, out_features),\
+#                nn.BatchNorm1d(out_features),\
                 nn.LeakyReLU()
                 )
+        self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))
+        nn.init.xavier_uniform_(self.W.data, gain=1.414)
 #        self.W1 = nn.Parameter(torch.zeros(size=(in_features, out_features)))
 #        nn.init.xavier_uniform_(self.W1.data, gain=1.414)
 #        self.W2 = nn.Parameter(torch.zeros(size=(in_features, out_features)))
@@ -46,13 +48,16 @@ class ScattterAttentionLayer(nn.Module):
         self.leakyrelu = nn.LeakyReLU(self.alpha)
     def forward(self,input,adj,data_index = [1,2,3,4]):
         # input is the feature
-#        support0 = torch.mm(input, self.W)
-        support0 = self.mlp(input)
+        support0 = torch.mm(input, self.W)
+#        support0 = self.mlp(input)
         gcn_diffusion_list = GCN_diffusion(adj,3,support0)
         N = support0.size()[0]
         h_A =  gcn_diffusion_list[0]
         h_A2 =  gcn_diffusion_list[1]
         h_A3 =  gcn_diffusion_list[2]
+#        h_A = self.leakyrelu(h_A)
+#        h_A2 = self.leakyrelu(h_A2)
+#        h_A3 = self.leakyrelu(h_A3)
         h_sct1,h_sct2,h_sct3 = scattering_diffusion(adj,support0)
         h_sct1 = torch.FloatTensor.abs_(h_sct1)**1
         h_sct2 = torch.FloatTensor.abs_(h_sct2)**1
