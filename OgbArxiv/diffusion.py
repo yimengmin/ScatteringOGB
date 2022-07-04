@@ -46,6 +46,7 @@ def SCT1st(sptensor,order,feature):
     D = D.to_dense() # transfer D from sparse tensor to normal torch tensor
     D = torch.pow(D, -1)
     D = D.unsqueeze(dim=1)
+    D[D == float('inf')] = 0.
     iteration = 2**(order-1)
     feature_p = feature
     for i in range(iteration):
@@ -86,6 +87,7 @@ def SCT1stv2(sptensor,order,feature):
     D = D.to_dense() # transfer D from sparse tensor to normal torch tensor
     D = torch.pow(D, -1)
     D = D.unsqueeze(dim=1)
+    D[D == float('inf')] = 0.
     iteration = 2**order
     scale_list = list(2**i - 1 for i in range(order+1))
 #    scale_list = [0,1,3,7]

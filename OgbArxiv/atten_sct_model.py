@@ -15,19 +15,19 @@ class ScattterAttentionLayer(nn.Module):
         self.alpha = alpha
 
 #        self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))
-        self.mlp = nn.Sequential(nn.Linear(in_features, 256),\
-                nn.BatchNorm1d(256),\
+        self.mlp = nn.Sequential(nn.Linear(in_features, 2048),\
+                nn.BatchNorm1d(2048),\
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
-                nn.Linear(256, 128),\
-                nn.BatchNorm1d(128),
+                nn.Linear(2048, 1024),\
+                nn.BatchNorm1d(1024),
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
-                nn.Linear(128, 64),\
-                nn.BatchNorm1d(64),\
+                nn.Linear(1024, 512),\
+                nn.BatchNorm1d(512),\
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
-                nn.Linear(64, out_features),\
+                nn.Linear(512, out_features),\
                 nn.BatchNorm1d(out_features),\
                 nn.LeakyReLU()
                 )
@@ -56,6 +56,10 @@ class ScattterAttentionLayer(nn.Module):
         h_A =  gcn_diffusion_list[0]
         h_A2 =  gcn_diffusion_list[1]
         h_A3 =  gcn_diffusion_list[2]
+
+        h_A = self.leakyrelu(h_A)
+        h_A2 = self.leakyrelu(h_A2)
+        h_A3 = self.leakyrelu(h_A3)
         h_sct1,h_sct2,h_sct3 = scattering_diffusion(adj,support0)
         h_sct1 = torch.abs(h_sct1)**1
         h_sct2 = torch.abs(h_sct2)**1

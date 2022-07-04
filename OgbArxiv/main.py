@@ -120,10 +120,10 @@ y_true = data.y.to(device)
 def train(epoch):
     model.train()
     optimizer.zero_grad()
-    out_feature = model(features,adj,split_idx['train']) 
+    out_feature = model(features,adj) 
+#    out_feature = model(features,adj,split_idx['train']) 
     y_pred = out_feature.argmax(dim=-1, keepdim=True)
 #    print(y_pred.size())
-#    loss_train = F.nll_loss(y_pred[split_idx['train']], y_true.squeeze(1)[split_idx['train']])
     loss_train = F.nll_loss(out_feature[split_idx['train']], y_true.squeeze(1)[split_idx['train']])
 #    acc_train = accuracy(out_feature[split_idx['train']], y_true[split_idx['train']])
     acc_train = evaluator.eval({'y_true': y_true[split_idx['train']],'y_pred': y_pred[split_idx['train']],})['acc']
@@ -152,7 +152,7 @@ def test(epoch):
 highset_validation_accuracy = 0.1
 for i in range(args.epochs+1):
     train(i)
-    if i%25 == 0:
+    if i%5 == 0:
         validation_accuracy = vali(i)
         if validation_accuracy>highset_validation_accuracy:
             highset_validation_accuracy = validation_accuracy

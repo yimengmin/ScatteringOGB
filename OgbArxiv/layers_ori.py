@@ -35,18 +35,19 @@ class GC_withres(Module):
         support = torch.mm(input, self.weight)
         I_n = sp.eye(adj.shape[0])
         I_n = sparse_mx_to_torch_sparse_tensor(I_n).cuda()
-        A_gcn = adj +  I_n
-        degrees = torch.sparse.sum(A_gcn,0)
+
+        degrees = torch.sparse.sum(adj,0)
         D = degrees
         D = D.to_dense() # transfer D from sparse tensor to normal torch tensor
-        D = torch.pow(D, -0.5)
+        D = torch.pow(D, -1)
         D = D.unsqueeze(dim=1)
-        A_gcn_feature = support
-        A_gcn_feature = torch.mul(A_gcn_feature,D)
-        A_gcn_feature = torch.spmm(A_gcn,A_gcn_feature)
-        A_gcn_feature = torch.mul(A_gcn_feature,D)
-        output = A_gcn_feature * self.smooth + support
-        output = output/(1+self.smooth)
+        D_inv_x = D*support
+        W_D_inv_x = torch.spmm(adj,D_inv_x)
+
+        sctf = 0.5*support + 0.5*W_D_inv_x
+        output = support + self.smooth*sctf
+        output = output/(1+self.smooth) 
+#        output = torch.spmm((I_n+self.smooth*adj)/(1+self.smooth), support)
         if self.bias is not None:
             return output + self.bias
         else:
