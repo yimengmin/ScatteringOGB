@@ -28,7 +28,6 @@ class GNN_ogbproteins(nn.Module):
             x = self.bn1(x)
             x = F.leaky_relu(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
-#        x = self.convs[-1](x, adj)
         x = self.gcres(x,adj)
         return x
 

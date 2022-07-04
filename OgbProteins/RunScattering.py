@@ -1,6 +1,7 @@
 from ogb.nodeproppred import Evaluator
 import torch
 import torch.nn.functional as F
+import torch.nn as nn
 from torch_geometric.utils import to_undirected, add_self_loops
 from ogb.nodeproppred import PygNodePropPredDataset
 import time
@@ -9,10 +10,7 @@ import time
 
 import torch_geometric.transforms as T
 from torch_geometric.nn import GCNConv, SAGEConv
-print('ll')
-
 import argparse
-print('ll')
 #from ogb.nodeproppred import PygNodePropPredDataset
 #print('ll')
 
@@ -20,8 +18,6 @@ print('ll')
 #print('ll')
 
 #from ogb.nodeproppred import PygNodePropPredDataset, Evaluator
-
-print('ll')
 from logger import Logger
 
 class GCN(torch.nn.Module):
@@ -112,6 +108,12 @@ from models import GNN_ogbproteins
 
 
 
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+def weight_reset(m):
+    if isinstance(m, nn.Linear):
+        m.reset_parameters()
+
 
 def main():
     parser = argparse.ArgumentParser(description='OGBN-Proteins (GNN)')
@@ -182,11 +184,14 @@ def main():
 #    print('size')
 #    print(adj_t.size)
     model = GNN_ogbproteins(data.num_features,nlayers=args.num_layers,nhid=args.hidden_channels, nclass=112, dropout=args.dropout,smoo=args.smoo).to(device)
+    print('Total number of parameters:')
+    print(count_parameters(model))
     evaluator = Evaluator(name='ogbn-proteins')
     logger = Logger(args.runs, args)
 
     for run in range(args.runs):
 #        model.reset_parameters()
+        model.apply(weight_reset)
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
         for epoch in range(1, 1 + args.epochs):
             loss = train(model, data, train_idx, optimizer)
