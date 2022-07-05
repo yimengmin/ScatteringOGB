@@ -25,8 +25,6 @@ def GCN_diffusion(sptensor,order,feature):
 
     I_n = sp.eye(sptensor.size(0))
     I_n = sparse_mx_to_torch_sparse_tensor(I_n).cuda()
-#    print('I_n size')
-#    print(I_n)
     A_gcn = sptensor +  I_n
     degrees = torch.sparse.sum(A_gcn,0)
     D = degrees
@@ -37,7 +35,6 @@ def GCN_diffusion(sptensor,order,feature):
 
     A_gcn_feature = feature
     for i in range(order):
-##        print('GCN diffusion step: %d'%i)
         A_gcn_feature = torch.mul(A_gcn_feature,D)
         A_gcn_feature = torch.spmm(A_gcn,A_gcn_feature)
         A_gcn_feature = torch.mul(A_gcn_feature,D)

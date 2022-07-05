@@ -109,7 +109,7 @@ n_node_feats, n_edge_feats, n_classes = 8, 8, 112
 
 adj = sparse_mx_to_torch_sparse_tensor(adj).cuda()
 
-model = SCT_GAT_ogbproteins(1,args.hid,n_classes,dropout=args.dropout,nheads=args.nheads,smoo=args.smoo)
+model = SCT_GAT_ogbproteins(8,args.hid,n_classes,dropout=args.dropout,nheads=args.nheads,smoo=args.smoo)
 model = model.cuda()
 #write a batch sampler
 train_batch_size = args.batch_size 
@@ -120,7 +120,6 @@ optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,weight_decay=args.we
 
 y_true = dataset.whole_graph.y
 y_true = y_true.to(device)
-
 
 def train(epoch,criterion,batch_or_not = False):
 #    model.train()
@@ -133,9 +132,9 @@ def train(epoch,criterion,batch_or_not = False):
         sampler = BatchSampler(RandomSampler(range(len(train_idx)),replacement=True),train_batch_size, drop_last=True)
         batch_itet = 0
         for indices in sampler:
-            y_pred = model(features,adj,split_idx['train'][indices])
-            loss_train =  criterion(y_pred[split_idx['train']][indices], y_true.squeeze(1)[split_idx['train']][indices].float())
-            acc_train = evaluator.eval({'y_true': y_true[split_idx['train']][indices],'y_pred': y_pred[split_idx['train']][indices]})["rocauc"]
+            y_pred = model(features,adj,train_idx[indices])
+            loss_train =  criterion(y_pred[train_idx][indices], y_true.squeeze(1)[train_idx][indices].float())
+            acc_train = evaluator.eval({'y_true': y_true[train_idx][indices],'y_pred': y_pred[train_idx][indices]})["rocauc"]
             print('Training Accuracy at %d iteration: %.5f with batch id: %d'%(epoch,acc_train,batch_itet))
             batch_itet = batch_itet + 1
             loss_train.backward()
@@ -144,9 +143,10 @@ def train(epoch,criterion,batch_or_not = False):
         model.train()
         optimizer.zero_grad()
         #full batch
-        y_pred = model(features,adj,split_idx['train'])
-        loss_train = criterion(y_pred[split_idx['train']], y_true.squeeze(1)[split_idx['train']].float())
-        acc_train = evaluator.eval({'y_true': y_true[split_idx['train']],'y_pred': y_pred[split_idx['train']]})["rocauc"]
+        y_pred = model(features,adj,train_idx)
+#        loss_train = criterion(y_pred[train_idx], y_true.squeeze(1)[train_idx].float())
+        loss_train = criterion(y_pred[train_idx], y_true[train_idx].float())
+        acc_train = evaluator.eval({'y_true': y_true[train_idx],'y_pred': y_pred[train_idx]})["rocauc"]
         print('Training Accuracy at %d iteration: %.5f'%(epoch,acc_train))
         loss_train.backward()
         optimizer.step()
@@ -156,7 +156,7 @@ def vali(epoch):
     model.eval()
     out_feature = model(features,adj)
     y_pred = out_feature
-    acc_train = evaluator.eval({'y_true': y_true[split_idx['valid']],'y_pred': y_pred[split_idx['valid']]})['rocauc']
+    acc_train = evaluator.eval({'y_true': y_true[val_idx],'y_pred': y_pred[val_idx]})['rocauc']
     print('Validation Accuracy at %d iteration: %.5f'%(epoch,acc_train))
     return acc_train
 
@@ -165,7 +165,7 @@ def test(epoch):
     model.eval()
     out_feature = model(features,adj)
     y_pred = out_feature
-    acc_train = evaluator.eval({'y_true': y_true[split_idx['test']],'y_pred': y_pred[split_idx['test']]})['rocauc']
+    acc_train = evaluator.eval({'y_true': y_true[test_idx],'y_pred': y_pred[test_idx]})['rocauc']
     print('Championship model\'s  accuracy in %d iterations: %.5f'%(epoch,acc_train))
 
 

@@ -111,9 +111,12 @@ from models import GNN_ogbproteins
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 def weight_reset(m):
+#    if isinstance(m, nn.Linear) or isinstance(m,nn.Parameter):
+#        nn.init.xavier_uniform_(m.data, gain=1.414)
     if isinstance(m, nn.Linear):
         m.reset_parameters()
-
+    else:
+        pass
 
 def main():
     parser = argparse.ArgumentParser(description='OGBN-Proteins (GNN)')
@@ -190,7 +193,6 @@ def main():
     logger = Logger(args.runs, args)
 
     for run in range(args.runs):
-#        model.reset_parameters()
         model.apply(weight_reset)
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
         for epoch in range(1, 1 + args.epochs):
