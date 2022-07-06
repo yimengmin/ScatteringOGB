@@ -15,19 +15,15 @@ class ScattterAttentionLayer(nn.Module):
         self.alpha = alpha
 
 #        self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))
-        self.mlp = nn.Sequential(nn.Linear(in_features, 2048),\
-                nn.BatchNorm1d(2048),\
+        self.mlp = nn.Sequential(nn.Linear(in_features, 128),\
+                nn.BatchNorm1d(128),\
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
-                nn.Linear(2048, 1024),\
-                nn.BatchNorm1d(1024),
+                nn.Linear(128, 64),\
+                nn.BatchNorm1d(64),
                 nn.LeakyReLU(),\
                 nn.Dropout(dropout),\
-                nn.Linear(1024, 512),\
-                nn.BatchNorm1d(512),\
-                nn.LeakyReLU(),\
-                nn.Dropout(dropout),\
-                nn.Linear(512, out_features),\
+                nn.Linear(64, out_features),\
                 nn.BatchNorm1d(out_features),\
                 nn.LeakyReLU()
                 )
@@ -111,11 +107,6 @@ class ScattterAttentionLayer(nn.Module):
         '''
 
         attention = F.softmax(e, dim=1).view(N, 6, -1)
-#        print('attention on %d nodes'%N)
-#        print(attention[data_index])
-#        print('--------')
-#        print(self.a)
-#        print('======')
         h_all = torch.cat((h_A.unsqueeze(dim=2),h_A2.unsqueeze(dim=2),h_A3.unsqueeze(dim=2),\
                 h_sct1.unsqueeze(dim=2),h_sct2.unsqueeze(dim=2),h_sct3.unsqueeze(dim=2)),dim=2).view(N, 6, -1)
         h_prime = torch.mul(attention, h_all) # element eise product

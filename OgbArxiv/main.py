@@ -66,6 +66,8 @@ parser.add_argument('--use_gdc', action='store_true',
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 torch.manual_seed(args.seed)
 if args.cuda:
@@ -85,35 +87,21 @@ data = dataset[0]
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 x = data.x.to(device)
 edge_index = data.edge_index.to(device)
-# Num of feat:1639
 adj = to_scipy_sparse_matrix(edge_index = data.edge_index)
 adj = adj+ adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
-#print(type(adj)) #<class 'scipy.sparse.csr.csr_matrix'>
-#A_tilde = normalize_adjacency_matrix(adj,sp.eye(adj.shape[0]))
-#adj_p = normalizemx(adj)
 #
 features = data.x
 features = torch.FloatTensor(np.array(features))
 features = features.to(device)
 adj = sparse_mx_to_torch_sparse_tensor(adj).cuda()
-#from diffusion import GCN_diffusion,scattering_diffusion
-#gcn_diffusion_list = GCN_diffusion(adj,3,features)
-#print(gcn_diffusion_list[1].size())
-#h_sct1,h_sct2,h_sct3 = scattering_diffusion(adj,features)
-#print(h_sct1.size())
 model = SCT_GAT_ogbarxiv(features.shape[1],args.hid,dataset.num_classes,dropout=args.dropout,nheads=args.nheads,smoo=args.smoo)
 model = model.cuda()
 
-#from torch.optim.lr_scheduler import StepLR
-#optimizer = torch.optim.RMSprop(model.parameters(), lr=args.lr,weight_decay=args.weight_decay)
+print('Total number of parameters:')
+print(count_parameters(model))
+
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,weight_decay=args.weight_decay)
-#scheduler = StepLR(optimizer, step_size=100, gamma=0.9)
-#pred = out_feature[train_idx]
-
-
-### y true
 y_true = data.y.to(device)
-#y_true = y_true[split_idx['train']]
 
 
 
@@ -121,16 +109,12 @@ def train(epoch):
     model.train()
     optimizer.zero_grad()
     out_feature = model(features,adj) 
-#    out_feature = model(features,adj,split_idx['train']) 
     y_pred = out_feature.argmax(dim=-1, keepdim=True)
-#    print(y_pred.size())
     loss_train = F.nll_loss(out_feature[split_idx['train']], y_true.squeeze(1)[split_idx['train']])
-#    acc_train = accuracy(out_feature[split_idx['train']], y_true[split_idx['train']])
     acc_train = evaluator.eval({'y_true': y_true[split_idx['train']],'y_pred': y_pred[split_idx['train']],})['acc']
     print('Training Accuracy at %d iteration: %.5f'%(epoch,acc_train))
     loss_train.backward()
     optimizer.step()
-#    scheduler.step()
 
 def vali(epoch):
     model.eval()
@@ -157,8 +141,6 @@ for i in range(args.epochs+1):
         if validation_accuracy>highset_validation_accuracy:
             highset_validation_accuracy = validation_accuracy
             torch.save(model.state_dict(),'SAved_ogbmodels/championship_%s_model_dict.pt'%dataset_name)
-#        test(i)
-#    if i%1000 ==0:
 print('Championship Validation Accuracy: %.5f'%highset_validation_accuracy)
 model = SCT_GAT_ogbarxiv(features.shape[1],args.hid,dataset.num_classes,dropout=args.dropout,nheads=args.nheads,smoo=args.smoo)
 model = model.cuda()
