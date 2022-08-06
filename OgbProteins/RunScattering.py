@@ -11,13 +11,6 @@ import time
 import torch_geometric.transforms as T
 from torch_geometric.nn import GCNConv, SAGEConv
 import argparse
-#from ogb.nodeproppred import PygNodePropPredDataset
-#print('ll')
-
-#from ogb.nodeproppred import Evaluator
-#print('ll')
-
-#from ogb.nodeproppred import PygNodePropPredDataset, Evaluator
 from logger import Logger
 
 class GCN(torch.nn.Module):
@@ -47,28 +40,6 @@ class GCN(torch.nn.Module):
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.convs[-1](x, adj_t)
         return x
-
-
-class SAGE(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, num_layers,
-                 dropout):
-        super(SAGE, self).__init__()
-
-        self.convs = torch.nn.ModuleList()
-        self.convs.append(SAGEConv(in_channels, hidden_channels))
-        for _ in range(num_layers - 2):
-            self.convs.append(SAGEConv(hidden_channels, hidden_channels))
-        self.convs.append(SAGEConv(hidden_channels, out_channels))
-
-        self.dropout = dropout
-
-    def reset_parameters(self):
-        for conv in self.convs:
-            conv.reset_parameters()
-
-    def forward(self, x, adj_t):
-        for conv in self.convs[:-1]:
-            x = conv(x, adj_t)
 
 def train(model, data, train_idx, optimizer):
     model.train()
@@ -147,45 +118,12 @@ def main():
 
     split_idx = dataset.get_idx_split()
     train_idx = split_idx['train'].to(device)
-
-#    data.adj_t.set_value_(None)
-#    if args.use_sage:
-#        model = SAGE(data.num_features, args.hidden_channels, 112,
-#                     args.num_layers, args.dropout).to(device)
-#    else:
-#        model = GCN(data.num_features, args.hidden_channels, 112,
-#                    args.num_layers, args.dropout).to(device)
-
-
-        # Pre-compute GCN normalization.
-#        adj_t = data.adj_t.set_diag()
-#        print(dir(adj_t))
-#        print(adj_t.sparse_size)
-#        deg = adj_t.sum(dim=1).to(torch.float)
-#        deg_inv_sqrt = deg.pow(-0.5)
-#        deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
-#        adj_t = deg_inv_sqrt.view(-1, 1) * adj_t * deg_inv_sqrt.view(1, -1)
-#        data.adj_t = adj_t
-
-
-#    adj_t = data.adj_t.set_diag()
-#    data.adj_t = adj_t
     data.adj_t.set_value_(None)
     adj_t = data.adj_t.set_diag()
     data.adj_t = adj_t
     data = data.to(device)
-#    deg = adj_t.sum(dim=1).to(torch.float)
-#    deg_inv_sqrt = deg.pow(-0.5)
-#    deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
-#    adj_t = deg_inv_sqrt.view(-1, 1) * adj_t * deg_inv_sqrt.view(1, -1)
-#    print(adj_t.to_torch_sparse_csr_tensor())
-#    print(adj_t.to_torch_sparse_coo_tensor())
-#    adj_t = adj_t.to_torch_sparse_coo_tensor()
 
-#    print('-----')
-#    print(dir(adj_t))
-#    print('size')
-#    print(adj_t.size)
+
     model = GNN_ogbproteins(data.num_features,nlayers=args.num_layers,nhid=args.hidden_channels, nclass=112, dropout=args.dropout,smoo=args.smoo).to(device)
     print('Total number of parameters:')
     print(count_parameters(model))
@@ -204,8 +142,6 @@ def main():
 
                 if epoch % args.log_steps == 0:
                     train_rocauc, valid_rocauc, test_rocauc = result
-#                    print(train_rocauc)
-#                    print('-----')
                     print(f'Run: {run + 1:02d}, '
                           f'Epoch: {epoch:02d}, '
                           f'Loss: {loss:.4f}, '
